@@ -59,6 +59,9 @@ class CombinatorialSpecification(
         ],
         equivalence_paths: Iterable[Sequence[CombinatorialClassType]],
     ):
+        print(repr(root))
+        print(repr(list(strategies)))
+        print(repr(list(list(eqv_path) for eqv_path in equivalence_paths)))
         self.root = root
         self.rules_dict: Dict[CombinatorialClassType, AbstractRule] = {}
         self._populate_rules_dict(strategies, equivalence_paths)
