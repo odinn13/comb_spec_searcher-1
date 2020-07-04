@@ -140,6 +140,36 @@ class RuleDBBase(abc.ABC):
                 return start, ends
         return None
 
+    def all_rules_from_equivalence_rule(
+        self, start_end_list: List[RuleKey]
+    ) -> Dict[RuleKey, RuleKey]:
+        """
+        Return an equivalence_rule -> rule mappind dict for all equivalence rules in
+        start_end_list
+        """
+        eqv_mapping: Dict[RuleKey, RuleKey] = {}
+
+        # maps the equivalence version of a key to the passed version
+        start_end_list_dict: Dict[RuleKey, RuleKey] = {}
+        for start, ends in start_end_list:
+            eqv_key = (
+                self.equivdb[start],
+                tuple(sorted([self.equivdb[end] for end in ends])),
+            )
+            start_end_list_dict[eqv_key] = (start, ends)
+
+        for rule in self:
+            start, ends = rule
+            temp_start = self.equivdb[start]
+            temp_ends = tuple(sorted(map(self.equivdb.__getitem__, ends)))
+            if (temp_start, temp_ends) in start_end_list_dict:
+                eqv_mapping[start_end_list_dict[(temp_start, temp_ends)]] = (
+                    start,
+                    ends,
+                )
+
+        return eqv_mapping
+
     def find_specification(
         self, label: int, minimization_time_limit: float, iterative: bool = False
     ) -> Node:
@@ -189,12 +219,15 @@ class RuleDBBase(abc.ABC):
     ) -> Specification:
         children: Dict[int, Tuple[int, ...]] = dict()
         internal_nodes = set([label])
+        start_end_list: List[RuleKey] = []
         for node in proof_tree_node.nodes():
-            eqv_start, eqv_ends = (
-                node.label,
-                tuple(child.label for child in node.children),
+            start_end_list.append(
+                (node.label, tuple(child.label for child in node.children))
             )
-            rule = self.rule_from_equivalence_rule(eqv_start, eqv_ends)
+        eqv_mapping = self.all_rules_from_equivalence_rule(start_end_list)
+        for eqv_start, eqv_ends in start_end_list:
+            # rule = self.rule_from_equivalence_rule(eqv_start, eqv_ends)
+            rule = eqv_mapping.get((eqv_start, eqv_ends), None)
             if rule is not None:
                 start, ends = rule
                 children[start] = ends
