@@ -165,6 +165,13 @@ class AbstractStrategy(
         return self._workable
 
     @abc.abstractmethod
+    def can_be_equivalent(self) -> bool:
+        """
+        Return True if every Rule returned with one non-empty child is an
+        equivalence rule.
+        """
+
+    @abc.abstractmethod
     def decomposition_function(
         self, comb_class: CombinatorialClassType
     ) -> Optional[Tuple[CombinatorialClassType, ...]]:
@@ -334,6 +341,14 @@ class Strategy(AbstractStrategy[CombinatorialClassType, CombinatorialObjectType]
                 raise StrategyDoesNotApply("Strategy does not apply")
         return tuple(dict() for _ in children)
 
+    @staticmethod
+    def get_eq_symbol() -> str:
+        return "="
+
+    @staticmethod
+    def get_op_symbol() -> str:
+        return "x"
+
 
 class CartesianProductStrategy(
     Strategy[CombinatorialClassType, CombinatorialObjectType]
@@ -362,6 +377,10 @@ class CartesianProductStrategy(
             workable=workable,
         )
 
+    @staticmethod
+    def can_be_equivalent() -> bool:
+        return True
+
     def constructor(
         self,
         comb_class: CombinatorialClassType,
@@ -372,7 +391,9 @@ class CartesianProductStrategy(
             if children is None:
                 raise StrategyDoesNotApply("Strategy does not apply")
         return CartesianProduct(
-            children, extra_parameters=self.extra_parameters(comb_class, children)
+            comb_class,
+            children,
+            extra_parameters=self.extra_parameters(comb_class, children),
         )
 
 
@@ -398,6 +419,10 @@ class DisjointUnionStrategy(Strategy[CombinatorialClassType, CombinatorialObject
             possibly_empty=possibly_empty,
             workable=workable,
         )
+
+    @staticmethod
+    def can_be_equivalent() -> bool:
+        return True
 
     def constructor(
         self,
@@ -442,6 +467,14 @@ class DisjointUnionStrategy(Strategy[CombinatorialClassType, CombinatorialObject
             children = self.decomposition_function(comb_class)
         idx = DisjointUnionStrategy.backward_map_index(objs)
         return cast(CombinatorialObjectType, objs[idx])
+
+    @staticmethod
+    def get_eq_symbol() -> str:
+        return "="
+
+    @staticmethod
+    def get_op_symbol() -> str:
+        return "+"
 
 
 class SymmetryStrategy(
@@ -505,6 +538,10 @@ class VerificationStrategy(
         if children is None:
             children = self.decomposition_function(comb_class)
         return VerificationRule(self, comb_class, children)
+
+    @staticmethod
+    def can_be_equivalent() -> bool:
+        return False
 
     def pack(self, comb_class: CombinatorialClassType) -> "StrategyPack":
         """

@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- When expanding verified nodes in a specification, the search now uses
+  `_auto_search_rules`, instead of `do_level` and `get_smallest_specification`.
+  This is a stripped back auto search method returning the equivalence paths
+  and strategies needed to create a specification.
+
+### Fixed
+- fixed sanity checking in `comb_spec_searcher`
+
+### Removed
+- `DisableLogging` was removed from `utils` as it is no longer used.
+
+## [1.3.0] - 2020-07-07
+### Added
+- added an optional `fixed_values` parameter to the `DisjointUnion` constructor,
+  that allows you to set a value that a child's parameter must take.
+- add the abstract method `can_be_equivalent` to `AbstractStrategy`.
+
+### Changed
+- removed the method `is_equivalence` from `Constructor`. You should instead
+  use the `is_equivalence` method on the `Rule`.
+- the `CartesianProduct` now considers compositions of all parameters and
+  not just `n`.
+- the `RelianceProfile` type changed to work multiple parameters. It is now a
+  dictionary pointing from parameters to the values.
+
 ### Fixed
 - ignore rules where the left and non-empty right hand sides are the same
 

@@ -2,11 +2,10 @@
 A combinatorial specification is a set rules of the form a -> b1, ..., bk
 where each of the bi appear exactly once on the left hand side of some rule.
 """
-import logging
 from copy import copy
 from functools import reduce
 from operator import mul
-from typing import Dict, Generic, Iterable, Iterator, List, Sequence, Tuple
+from typing import Callable, Dict, Generic, Iterable, Iterator, List, Sequence, Tuple
 
 import sympy
 from logzero import logger
@@ -21,8 +20,6 @@ from .combinatorial_class import (
 from .exception import (
     IncorrectGeneratingFunctionError,
     InvalidOperationError,
-    NoMoreClassesToExpandError,
-    SpecificationNotFound,
     TaylorExpansionError,
 )
 from .strategies import (
@@ -38,7 +35,6 @@ from .strategies import (
 )
 from .strategies.rule import AbstractRule
 from .utils import (
-    DisableLogging,
     RecursionLimit,
     maple_equations,
     pretty_print_equations,
@@ -71,15 +67,22 @@ class CombinatorialSpecification(
         ],
         equivalence_paths: Iterable[Sequence[CombinatorialClassType]],
         expand_verified: bool = True,
+        is_empty_function: Callable[[CombinatorialClassType], bool] = None,
     ):
         self.root = root
         self.rules_dict: Dict[CombinatorialClassType, AbstractRule] = {}
+        self.is_empty_function = is_empty_function
         self._populate_rules_dict(strategies, equivalence_paths, expand_verified)
         for rule in list(
             self.rules_dict.values()
         ):  # list as we lazily assign empty rules
             rule.set_subrecs(self.get_rule)
         self.labels: Dict[CombinatorialClassType, int] = {}
+
+    def _is_empty(self, comb_class: CombinatorialClassType) -> bool:
+        if self.is_empty_function is None:
+            return comb_class.is_empty()
+        return self.is_empty_function(comb_class)
 
     def _populate_rules_dict(
         self,
@@ -100,7 +103,9 @@ class CombinatorialSpecification(
             if isinstance(strategy, AlreadyVerified):
                 continue
             rule = strategy(comb_class)
-            non_empty_children = rule.non_empty_children()
+            non_empty_children = rule.non_empty_children(
+                is_empty_function=self._is_empty
+            )
             if rule.is_equivalence():
                 assert isinstance(rule, Rule)
                 equivalence_rules[(comb_class, non_empty_children[0])] = (
@@ -154,30 +159,8 @@ class CombinatorialSpecification(
                 ),
             )
             logger.info(css.run_information())
-            while True:
-                try:
-                    css.do_level()
-                except NoMoreClassesToExpandError:
-                    with DisableLogging(logging.INFO):
-                        new_rules = css.ruledb.get_smallest_specification(
-                            css.start_label
-                        )
-                    break
-                try:
-                    with DisableLogging(logging.INFO):
-                        new_rules = css.ruledb.get_smallest_specification(
-                            css.start_label
-                        )
-                    break
-                except SpecificationNotFound:
-                    pass
-            rules, eqv_paths = new_rules
-            comb_class_eqv_paths = tuple(
-                tuple(map(css.classdb.get_class, path)) for path in eqv_paths
-            )
-            comb_class_rules = [
-                (css.classdb.get_class(label), rule) for label, rule in rules
-            ]
+            # pylint: disable=protected-access
+            comb_class_rules, comb_class_eqv_paths = css._auto_search_rules()
             self._populate_rules_dict(comb_class_rules, comb_class_eqv_paths, True)
 
     def get_rule(
@@ -185,7 +168,7 @@ class CombinatorialSpecification(
     ) -> AbstractRule[CombinatorialClassType, CombinatorialObjectType]:
         """Return the rule with comb class on the left."""
         if comb_class not in self.rules_dict:
-            if comb_class.is_empty():
+            if self._is_empty(comb_class):
                 empty_strat = EmptyStrategy()
                 self.rules_dict[comb_class] = empty_strat(comb_class)
         return self.rules_dict[comb_class]
